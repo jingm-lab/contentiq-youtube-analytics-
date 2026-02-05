@@ -51,9 +51,6 @@ def get_thresholds(_conn, _cursor):
         print(f"Error: {e}")
 
 
-if "search_term" not in st.session_state:
-    st.session_state.search_term = ""
-
 if "selected_channel" not in st.session_state:
     st.session_state.selected_channel = None
 
@@ -62,8 +59,8 @@ mode = st.sidebar.radio("Select A View", ["Search for videos", "Dashboard"])
 
 if mode == "Search for videos":
     st.title("ContentIQ")
-    search_term = st.text_input("Search for videos", value=st.session_state.search_term)
-    st.session_state.search_term = search_term
+    search_term = st.text_input("Search for videos", key="search_term")
+
     if search_term:
         model = load_model()
         query_embedding = model.encode(search_term)
