@@ -1,0 +1,12 @@
+contentiq_dbt:
+  outputs:
+    dev:
+      dbname: contentiq
+      host: contentiq-postgres-1
+      pass: "gazB6C2iRMzsFFOBGDZbFgbIS7hahMH6"
+      port: 5432
+      schema: public
+      threads: 4
+      type: postgres
+      user: postgres
+  target: dev

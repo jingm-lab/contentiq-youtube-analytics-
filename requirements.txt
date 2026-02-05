@@ -1,0 +1,24 @@
+# YouTube Data API client
+google-api-python-client==2.187.0
+
+# Database
+psycopg2-binary==2.9.11
+
+# Environment variables
+python-dotenv==1.2.1
+
+# ML embeddings (includes torch, transformers, scipy, scikit-learn)
+sentence-transformers==5.2.0
+
+# Data processing
+pandas==2.3.3
+tqdm==4.67.1
+
+# Visualization
+streamlit==1.53.0
+plotly==6.5.0
+matplotlib==3.10.8
+
+# dbt (used via BashOperator in Airflow DAGs)
+dbt-core==1.11.2
+dbt-postgres==1.10.0
