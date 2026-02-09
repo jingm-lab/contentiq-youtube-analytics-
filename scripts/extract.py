@@ -1,7 +1,6 @@
 from apiclient.discovery import build
 import googleapiclient.errors
 import os
-from dotenv import load_dotenv
 import json
 from scripts.state_manager import StateManager
 from datetime import datetime, timezone
@@ -117,9 +116,9 @@ class extract:
     def extract_channel_data(self):
         """Perform backfill for initial extraction of data."""
         # Create state manager instance
-        state_manager = StateManager()
+        state_manager = StateManager(self.channel_handle)
         # Get current state for this channel
-        state = state_manager.get_channel_state(self.channel_handle)
+        state = state_manager.state
         channel_id = state.get("channel_id")
         playlist_id = state.get("playlist_id")
         if not channel_id or not playlist_id:
@@ -144,9 +143,7 @@ class extract:
                 videos_data = self.get_video_details(video_ids)
                 if current_page_token is None:
                     current_date = videos_data[0]["snippet"]["publishedAt"]
-                    state_manager.update_channel_state(
-                        self.channel_handle, current_date=current_date
-                    )
+                    state_manager.update_channel_state(current_date=current_date)
 
                 # call save_json to save data before updating the states
                 self.save_videos_json(videos_data)
@@ -155,7 +152,6 @@ class extract:
 
                 status = "in progress"
                 state_manager.update_channel_state(
-                    self.channel_handle,
                     channel_id=channel_id,
                     playlist_id=playlist_id,
                     fetch_date=fetch_date,
@@ -168,7 +164,7 @@ class extract:
                 if not current_page_token:
                     status = "completed"
                     state_manager.update_channel_state(
-                        self.channel_handle, status=status, error_message=None
+                        status=status, error_message=None
                     )
                     state_manager.save_state()
                     break
@@ -180,7 +176,6 @@ class extract:
 
                 status = "failed"
                 state_manager.update_channel_state(
-                    self.channel_handle,
                     channel_id=channel_id,
                     playlist_id=playlist_id,
                     fetch_date=fetch_date,
@@ -196,7 +191,6 @@ class extract:
             except Exception as e:
                 status = "failed"
                 state_manager.update_channel_state(
-                    self.channel_handle,
                     channel_id=channel_id,
                     playlist_id=playlist_id,
                     fetch_date=fetch_date,
@@ -211,9 +205,8 @@ class extract:
 
     def extract_incremental_data(self):
         """Perform daily extraction of new video data."""
-        state_manager = StateManager()
-        state = state_manager.get_channel_state(self.channel_handle)
-        channel_id = state.get("channel_id")
+        state_manager = StateManager(self.channel_handle)
+        state = state_manager.state
         playlist_id = state.get("playlist_id")
         last_video_pub_date = state.get("current_date")
         fetch_date = str(datetime.now(timezone.utc))
@@ -235,7 +228,6 @@ class extract:
 
             status = "completed"
             state_manager.update_channel_state(
-                self.channel_handle,
                 fetch_date=fetch_date,
                 status=status,
                 current_date=last_video_pub_date,
@@ -252,7 +244,6 @@ class extract:
 
             status = "failed"
             state_manager.update_channel_state(
-                self.channel_handle,
                 fetch_date=fetch_date,
                 status=status,
                 num_videos_fetched=0,
@@ -265,7 +256,6 @@ class extract:
         except Exception as e:
             status = "failed"
             state_manager.update_channel_state(
-                self.channel_handle,
                 fetch_date=fetch_date,
                 status=status,
                 num_videos_fetched=0,
@@ -361,13 +351,13 @@ def main(mode="refresh"):
         "codebasics",
         "VisuallyExplainedEducation",
     ]
-    state_manager = StateManager()
 
     for channel_handle in tqdm(channel_handles):
+        state_manager = StateManager(channel_handle)
         extractor = extract(channel_handle=channel_handle)
 
         if mode == "backfill":
-            state = state_manager.get_channel_state(channel_handle)
+            state = state_manager.state
             status = state.get("status")
             if status == "completed":
                 print(
@@ -380,13 +370,6 @@ def main(mode="refresh"):
         elif mode == "incremental":
             print(f"Starting incremental extraction for {channel_handle}")
             extractor.extract_incremental_data()
-
-        final_status = state_manager.get_channel_state(channel_handle).get("status")
-        if final_status == "completed":
-            print(f"Completed extraction for {channel_handle}")
-        elif final_status == "failed":
-            error = state_manager.get_channel_state(channel_handle).get("error_message")
-            print(f"Failed extraction for {channel_handle} due to {error}")
 
 
 if __name__ == "__main__":
