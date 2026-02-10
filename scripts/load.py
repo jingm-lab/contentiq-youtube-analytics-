@@ -57,6 +57,7 @@ class load:
             self.cursor.execute(insert_query, record_to_insert)
 
     def load_videos(self):
+        all_rows = []
         for folder in self.data_path.iterdir():
             if not folder.is_dir():
                 continue
@@ -67,50 +68,46 @@ class load:
             last_refreshed = state.get("fetch_date")
 
             for json_file in folder.glob("*.jsonl"):
-                self.process_video_json(json_file, last_refreshed)
+                all_rows.extend(self.parse_video_rows(json_file, last_refreshed))
+        all_rows.sort(key=lambda r: r[0])
+        for record in all_rows:
+            placeholder = ", ".join(["%s"] * len(record))
+
+            insert_query = f"""
+            INSERT INTO videos (video_id, channel_id, title, description, published_at, 
+            view_count, like_count, comment_count, last_refreshed, tags)
+            VALUES ({placeholder})
+            ON CONFLICT (video_id)
+            DO UPDATE SET
+                view_count = EXCLUDED.view_count,
+                like_count = EXCLUDED.like_count,
+                comment_count = EXCLUDED.comment_count,
+                last_refreshed = EXCLUDED.last_refreshed;
+            """
+            self.cursor.execute(insert_query, record)
+
         self.conn.commit()
 
-    def process_video_json(self, json_file, last_refreshed) -> None:
+    def parse_video_rows(self, json_file, last_refreshed):
+        rows = []
         with open(json_file, "r", encoding="utf-8") as f:
             for line in f:
                 data = json.loads(line)
-                video_id = data["id"]
-                channel_id = data["snippet"]["channelId"]
-                title = data["snippet"]["title"]
-                description = data["snippet"].get("description", None)
-                published_date = data["snippet"]["publishedAt"]
-                view_count = data["statistics"].get("viewCount", None)
-                like_count = data["statistics"].get("likeCount", None)
-                comment_count = data["statistics"].get("commentCount", None)
-                tags = data["snippet"].get("tags", [])
-
-                record_to_insert = (
-                    video_id,
-                    channel_id,
-                    title,
-                    description,
-                    published_date,
-                    view_count,
-                    like_count,
-                    comment_count,
-                    last_refreshed,
-                    tags,
+                rows.append(
+                    (
+                        data["id"],
+                        data["snippet"]["channelId"],
+                        data["snippet"]["title"],
+                        data["snippet"].get("description", None),
+                        data["snippet"]["publishedAt"],
+                        data["statistics"].get("viewCount", None),
+                        data["statistics"].get("likeCount", None),
+                        data["statistics"].get("commentCount", None),
+                        last_refreshed,
+                        data["snippet"].get("tags", []),
+                    )
                 )
-
-                placeholder = ", ".join(["%s"] * len(record_to_insert))
-
-                insert_query = f"""
-                INSERT INTO videos (video_id, channel_id, title, description, published_at, 
-                view_count, like_count, comment_count, last_refreshed, tags)
-                VALUES ({placeholder})
-                ON CONFLICT (video_id)
-                DO UPDATE SET
-                    view_count = EXCLUDED.view_count,
-                    like_count = EXCLUDED.like_count,
-                    comment_count = EXCLUDED.comment_count,
-                    last_refreshed = EXCLUDED.last_refreshed;
-                """
-                self.cursor.execute(insert_query, record_to_insert)
+        return rows
 
     def load_state(self):
         for folder in self.data_path.iterdir():
