@@ -17,6 +17,7 @@ logs/
 contentiq_dbt/target/
 contentiq_dbt/logs/
 contentiq_dbt/.user.yml
+contentiq_dbt/profiles.yml
 
 # Airflow auto-generated config
 config/airflow.cfg
